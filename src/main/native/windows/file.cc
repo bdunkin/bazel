@@ -102,8 +102,10 @@ int IsSymlinkOrJunction(const WCHAR* path, bool* result, wstring* error) {
     return IsSymlinkOrJunctionResult::kError;
   }
 
-  DWORD attrs = ::GetFileAttributesW(path);
-  if (attrs == INVALID_FILE_ATTRIBUTES) {
+  WIN32_FIND_DATAW findData;
+  HANDLE searchHandle = ::FindFirstFileW(path, &findData);
+
+  if (searchHandle == INVALID_HANDLE_VALUE) {
     DWORD err = GetLastError();
     if (err == ERROR_FILE_NOT_FOUND || err == ERROR_PATH_NOT_FOUND) {
       return IsSymlinkOrJunctionResult::kDoesNotExist;
@@ -114,10 +116,18 @@ int IsSymlinkOrJunction(const WCHAR* path, bool* result, wstring* error) {
                                 L"IsSymlinkOrJunction", path, err);
     }
     return IsSymlinkOrJunctionResult::kError;
-  } else {
-    *result = (attrs & FILE_ATTRIBUTE_REPARSE_POINT);
-    return IsSymlinkOrJunctionResult::kSuccess;
   }
+
+  if (!(findData.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT)) {
+    *result = false;
+  } else {
+    DWORD tag = findData.dwReserved0 & 0xFFFF;
+    *result = (tag == IO_REPARSE_TAG_SYMLINK || 
+               tag == IO_REPARSE_TAG_MOUNT_POINT);
+  }
+  
+  FindClose(searchHandle);
+  return IsSymlinkOrJunctionResult::kSuccess;
 }
 
 int GetChangeTime(const WCHAR* path, bool follow_reparse_points,
