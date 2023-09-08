@@ -121,11 +121,12 @@ int IsSymlinkOrJunction(const WCHAR* path, bool* result, wstring* error) {
   if (!(findData.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT)) {
     *result = false;
   } else {
-    DWORD tag = findData.dwReserved0 & 0xFFFF;
-    *result = (tag == IO_REPARSE_TAG_SYMLINK || 
-               tag == IO_REPARSE_TAG_MOUNT_POINT);
+    // See https://learn.microsoft.com/en-us/windows/win32/fileio/reparse-point-tags
+    DWORD reparseTag = findData.dwReserved0;
+    *result = (reparseTag == IO_REPARSE_TAG_SYMLINK) ||
+              (reparseTag == IO_REPARSE_TAG_MOUNT_POINT);
   }
-  
+
   FindClose(searchHandle);
   return IsSymlinkOrJunctionResult::kSuccess;
 }
